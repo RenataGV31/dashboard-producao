@@ -6,57 +6,79 @@ import plotly.express as px
 # CONFIGURAÇÃO DA PÁGINA
 # ==============================
 st.set_page_config(
-    page_title="Dashboard Gerencial - Produção",
+    page_title="Dashboard Gerencial de Produção",
     layout="wide",
-    page_icon="📊"
+    page_icon="💠"
 )
 
 # ==============================
-# ESTILO (AZUL CLARO – GERENCIAL)
+# ESTILO – DESIGN AMIGOZ
 # ==============================
-st.markdown(
-    """
-    <style>
-        .stMetric {
-            background-color: #EAF2FB;
-            padding: 15px;
-            border-radius: 10px;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
+st.markdown("""
+<style>
+.main {
+    background-color: #f4f8fb;
+}
+
+.header {
+    background: linear-gradient(90deg, #00A3E0, #0077B6);
+    padding: 30px;
+    border-radius: 12px;
+    color: white;
+    margin-bottom: 25px;
+}
+
+.kpi {
+    background-color: white;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ==============================
+# CABEÇALHO
+# ==============================
+st.markdown("""
+<div class="header">
+    <h1>Dashboard Gerencial de Produção</h1>
+    <p>Análise semanal por convênio • Estilo AMIGOZ</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ==============================
+# UPLOAD EXCEL
+# ==============================
+arquivo = st.file_uploader(
+    "📂 Envie o arquivo EXCEL",
+    type=["xlsx", "xls"]
 )
 
-# ==============================
-# TÍTULO
-# ==============================
-st.title("📊 Dashboard Gerencial de Produção")
-st.caption("Análise semanal por convênio com ranking e KPIs")
-
-# ==============================
-# UPLOAD DO CSV
-# ==============================
-arquivo = st.file_uploader("📂 Envie o arquivo CSV", type=["csv"])
-
-if arquivo is not None:
+if arquivo:
     # ==============================
-    # LEITURA E TRATAMENTO DOS DADOS
+    # LEITURA DO EXCEL
     # ==============================
-    df = pd.read_csv(arquivo)
+    df = pd.read_excel(arquivo, engine="openpyxl")
 
+    # ==============================
+    # TRATAMENTO
+    # ==============================
     df["Data Cadastro"] = pd.to_datetime(df["Data Cadastro"])
-    df["Semana"] = df["Data Cadastro"].dt.strftime("%Y-%U")
 
     df["Valor Proposta"] = (
         df["Valor Proposta"]
+        .astype(str)
         .str.replace("R$", "", regex=False)
         .str.replace(".", "", regex=False)
         .str.replace(",", ".", regex=False)
         .astype(float)
     )
 
+    df["Semana"] = df["Data Cadastro"].dt.to_period("W").astype(str)
+
     # ==============================
-    # AGREGAÇÃO SEMANAL POR CONVÊNIO
+    # AGREGAÇÃO
     # ==============================
     resumo = (
         df.groupby(["Convenio", "Semana"])
@@ -65,82 +87,41 @@ if arquivo is not None:
             Valor_Total=("Valor Proposta", "sum")
         )
         .reset_index()
-        .sort_values(["Convenio", "Semana"])
+        .sort_values(["Semana", "Valor_Total"], ascending=[False, False])
     )
 
-    resumo["Variação %"] = resumo.groupby("Convenio")["Valor_Total"].pct_change() * 100
-
-    resumo["Tendência"] = resumo["Variação %"].apply(
-        lambda x: "🔼 Aumentou" if x > 0 else "🔽 Caiu" if x < 0 else "➖ Estável"
-    )
-
-    # ==============================
-    # DEFINIÇÃO DAS SEMANAS
-    # ==============================
-    semanas = resumo["Semana"].unique()
-
-    if len(semanas) >= 2:
-        ultima_semana = semanas[-1]
-        semana_anterior = semanas[-2]
-    else:
-        ultima_semana = semanas[-1]
-        semana_anterior = semanas[-1]
-
+    ultima_semana = resumo["Semana"].max()
     atual = resumo[resumo["Semana"] == ultima_semana]
-    anterior = resumo[resumo["Semana"] == semana_anterior]
-
-    producao_atual = atual["Valor_Total"].sum()
-    producao_anterior = anterior["Valor_Total"].sum()
-
-    variacao_geral = (
-        (producao_atual / producao_anterior - 1) * 100
-        if producao_anterior > 0 else 0
-    )
-
-    top_convenio = (
-        atual.groupby("Convenio")["Valor_Total"]
-        .sum()
-        .sort_values(ascending=False)
-        .idxmax()
-    )
 
     # ==============================
     # KPIs
     # ==============================
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
 
-    kpi1.metric(
-        "Produção Total",
-        f"R$ {df['Valor Proposta'].sum():,.2f}"
-    )
+    with c1:
+        st.markdown("<div class='kpi'>", unsafe_allow_html=True)
+        st.metric("💰 Produção Total", f"R$ {df['Valor Proposta'].sum():,.2f}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    kpi2.metric(
-        "Produção Última Semana",
-        f"R$ {producao_atual:,.2f}"
-    )
+    with c2:
+        st.markdown("<div class='kpi'>", unsafe_allow_html=True)
+        st.metric("📅 Última Semana", f"R$ {atual['Valor_Total'].sum():,.2f}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    kpi3.metric(
-        "Variação Semana (%)",
-        f"{variacao_geral:.2f}%",
-        delta=f"{variacao_geral:.2f}%"
-    )
-
-    kpi4.metric(
-        "Convênio Destaque",
-        top_convenio
-    )
+    with c3:
+        st.markdown("<div class='kpi'>", unsafe_allow_html=True)
+        st.metric("🏆 Convênio Líder", atual.groupby("Convenio")["Valor_Total"].sum().idxmax())
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
 
     # ==============================
-    # RANKING DE CONVÊNIOS
+    # RANKING
     # ==============================
-    st.subheader("🏆 Ranking de Convênios – Maior Produção (Última Semana)")
-
     ranking = (
         atual.groupby("Convenio")["Valor_Total"]
         .sum()
-        .sort_values(ascending=False)
+        .sort_values(ascending=True)
         .reset_index()
     )
 
@@ -151,36 +132,13 @@ if arquivo is not None:
         orientation="h",
         color="Valor_Total",
         color_continuous_scale="Blues",
-        labels={"Valor_Total": "Valor Produzido (R$)", "Convenio": "Convênio"}
+        title="🏆 Ranking de Convênios – Maior Produção (Semana Atual)"
     )
 
     st.plotly_chart(fig_rank, use_container_width=True)
 
     # ==============================
-    # EVOLUÇÃO SEMANAL
+    # TABELA
     # ==============================
-    st.subheader("📈 Evolução Semanal por Convênio")
-
-    fig_line = px.line(
-        resumo,
-        x="Semana",
-        y="Valor_Total",
-        color="Convenio",
-        markers=True,
-        labels={
-            "Valor_Total": "Valor Produzido (R$)",
-            "Semana": "Semana"
-        }
-    )
-
-    st.plotly_chart(fig_line, use_container_width=True)
-
-    # ==============================
-    # TABELA ANALÍTICA
-    # ==============================
-    st.subheader("📋 Visão Analítica Detalhada")
-
-    st.dataframe(
-        resumo.sort_values(["Semana", "Valor_Total"], ascending=[False, False]),
-        use_container_width=True
-    )
+    st.subheader("📋 Detalhamento da Produção")
+    st.dataframe(resumo, use_container_width=True)
