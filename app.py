@@ -3,9 +3,11 @@ import pandas as pd
 import plotly.express as px
 
 # ---------- CONFIGURAÇÃO DA PÁGINA ----------
-st.set_page_config("page_title=""Dashboard Gerencial - Produção",
-"layout=""wide",
-"page_icon=""📊"")
+st.title("📊 Dashboard Gerencial de Produção")
+    page_title="Dashboard Gerencial - Produção",
+    layout="wide",
+    page_icon="📊
+
 
 # ---------- ESTILO (AZUL CLARO) ----------
 st.markdown(""""
